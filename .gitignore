@@ -1,0 +1,14 @@
+# Node.js stuff
+node_modules/
+npm-debug.log
+package-lock.json
+
+# SQLite database
+ZooDB.sqlite
+
+# Local dev junk
+*.log
+.DS_Store
+
+# Sensitive bits
+.env

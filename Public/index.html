@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KeyZookeeper - Tame the Access Jungle!</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <h1>KeyZookeeper: Tame the Access Jungle!</h1>
+    <form id="zooForm">
+      <label for="group">Pick Your Wild Group:</label>
+      <select id="group" required>
+        <option value="" disabled selected>Choose a group</option>
+        <!-- Populated by JS -->
+      </select>
+
+      <label>Rooms This Group Can Roam:</label>
+      <div id="roomCheckboxes"></div>
+
+      <button type="submit">Lock in the Roamers</button>
+    </form>
+
+    <h2>Zoo Census</h2>
+    <table id="censusTable">
+      <thead>
+        <tr>
+          <th>Group</th>
+          <th>Room</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <button id="exportBtn">Unleash the Census (CSV)</button>
+
+    <script src="safari.js"></script>
+  </body>
+</html>
