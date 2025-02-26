@@ -1,40 +1,94 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  let groups, roomGroups;
+  const groupForm = document.getElementById("groupForm");
+  const roomForm = document.getElementById("roomForm");
   const groupSelect = document.getElementById("group");
+  const roomSelect = document.getElementById("room");
   const roomCheckboxes = document.getElementById("roomCheckboxes");
-  const censusTbody = document.querySelector("#censusTable tbody");
+  const groupCheckboxes = document.getElementById("groupCheckboxes");
 
-  // Fetch groups and rooms
-  const response = await fetch("/api/zoo");
-  const { groups, rooms } = await response.json();
+  // Load initial data
+  async function loadJungle() {
+    const response = await fetch("/api/jungle");
+    const data = await response.json();
+    groups = data.groups;
+    roomGroups = data.roomGroups;
 
-  // Populate group dropdown
-  groups.forEach((group) => {
-    const option = document.createElement("option");
-    option.value = group;
-    option.textContent = group;
-    groupSelect.appendChild(option);
+    // Populate group dropdown
+    groupSelect.innerHTML =
+      '<option value="" disabled selected>Choose a group</option>';
+    groups.forEach((g) => {
+      const opt = document.createElement("option");
+      opt.value = g;
+      opt.textContent = g;
+      groupSelect.appendChild(opt);
+    });
+
+    // Populate room dropdown
+    roomSelect.innerHTML =
+      '<option value="" disabled selected>Choose a room</option>';
+    Object.entries(roomGroups).forEach(([name, doors]) => {
+      const opt = document.createElement("option");
+      opt.value = doors[0]; // Use first door as key
+      opt.textContent = `${name} (${doors.join(", ")})`;
+      roomSelect.appendChild(opt);
+    });
+
+    // Populate room checkboxes
+    roomCheckboxes.innerHTML = "";
+    Object.entries(roomGroups).forEach(([name, doors]) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<strong>${name}:</strong>`;
+      doors.forEach((door) => {
+        div.innerHTML += ` <label><input type="checkbox" name="room" value="${door}"> ${door}</label>`;
+      });
+      roomCheckboxes.appendChild(div);
+    });
+
+    // Populate group checkboxes
+    groupCheckboxes.innerHTML = "";
+    groups.forEach((group) => {
+      const label = document.createElement("label");
+      label.innerHTML = `<input type="checkbox" name="group" value="${group}"> ${group}`;
+      groupCheckboxes.appendChild(label);
+    });
+  }
+
+  await loadJungle();
+
+  // Toggle views
+  document.getElementById("groupViewBtn").addEventListener("click", () => {
+    groupForm.style.display = "block";
+    roomForm.style.display = "none";
   });
 
-  // Populate room checkboxes
-  rooms.forEach((room) => {
-    const label = document.createElement("label");
-    label.innerHTML = `<input type="checkbox" name="room" value="${room}"> ${room}`;
-    roomCheckboxes.appendChild(label);
+  document.getElementById("roomViewBtn").addEventListener("click", () => {
+    groupForm.style.display = "none";
+    roomForm.style.display = "block";
   });
 
-  // Update checkboxes when group changes
+  // Group view: update checkboxes
   groupSelect.addEventListener("change", async () => {
     const group = groupSelect.value;
     const response = await fetch(`/api/group/${group}`);
-    const assignedRooms = await response.json();
+    const assigned = await response.json();
     document.querySelectorAll('input[name="room"]').forEach((cb) => {
-      cb.checked = assignedRooms.includes(cb.value);
+      cb.checked = assigned.some((entry) => entry.door_id === cb.value);
     });
-    updateCensus();
   });
 
-  // Handle form submission
-  document.getElementById("zooForm").addEventListener("submit", async (e) => {
+  // Room view: update checkboxes
+  roomSelect.addEventListener("change", async () => {
+    const door = roomSelect.value;
+    const response = await fetch(`/api/room/${door}`);
+    const assigned = await response.json();
+    document.querySelectorAll('input[name="group"]').forEach((cb) => {
+      cb.checked = assigned.includes(cb.value);
+    });
+  });
+
+  // Group form submission
+  groupForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const group = groupSelect.value;
     const rooms = Array.from(
@@ -44,49 +98,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     await fetch(`/api/group/${group}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ rooms }),
+      body: JSON.stringify({ doors: rooms }),
     });
-    updateCensus();
   });
 
-  // Export to CSV
-  document.getElementById("exportBtn").addEventListener("click", () => {
-    const rows = Array.from(censusTbody.querySelectorAll("tr"));
-    if (rows.length === 0) {
-      alert("No critters in the census yet!");
-      return;
-    }
+  // Room form submission
+  roomForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const door = roomSelect.value;
+    const groups = Array.from(
+      document.querySelectorAll('input[name="group"]:checked')
+    ).map((cb) => cb.value);
 
-    let csvContent = "Group,Room\n";
-    rows.forEach((row) => {
-      const cols = row.querySelectorAll("td");
-      const group = cols[0].textContent;
-      const room = cols[1].textContent;
-      csvContent += `"${group}","${room}"\n`;
+    await fetch(`/api/room/${door}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groups }),
     });
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "zoo_census.csv";
-    link.click();
   });
 
-  // Update census table
-  async function updateCensus() {
-    censusTbody.innerHTML = "";
-    const response = await fetch("/api/zoo");
-    const { groups } = await response.json();
-    for (const group of groups) {
-      const res = await fetch(`/api/group/${group}`);
-      const rooms = await res.json();
-      rooms.forEach((room) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `<td>${group}</td><td>${room}</td>`;
-        censusTbody.appendChild(row);
+  // Add new group
+  document.getElementById("addGroupBtn").addEventListener("click", async () => {
+    const newGroup = prompt("Enter a new group name:");
+    if (!newGroup) return;
+    const response = await fetch("/api/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ group: newGroup }),
+    });
+    if (response.ok) {
+      const { groups: updatedGroups } = await response.json();
+      groups = updatedGroups;
+      groupSelect.innerHTML =
+        '<option value="" disabled selected>Choose a group</option>';
+      groups.forEach((g) => {
+        const opt = document.createElement("option");
+        opt.value = g;
+        opt.textContent = g;
+        groupSelect.appendChild(opt);
       });
+      groupCheckboxes.innerHTML += `<label><input type="checkbox" name="group" value="${newGroup}"> ${newGroup}</label>`;
     }
-  }
-
-  updateCensus(); // Initial load
+  });
 });
